@@ -8,3 +8,5 @@ numpy==1.26.4
 pandas==2.1.4
 anthropic==0.39.0
 scikit-learn==1.4.2
+geopy==2.4.1
+requests==2.31.0
