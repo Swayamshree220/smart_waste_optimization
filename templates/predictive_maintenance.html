@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}AI Predictive Maintenance | Smart Waste{% endblock %}
+
+{% block content %}
+<style>
+.card-box {
+    background: white;
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+}
+.badge-health { font-size: 0.85rem; }
+</style>
+
+<div class="container py-4">
+
+<!-- HEADER -->
+<div class="card-box bg-gradient text-white" style="background:linear-gradient(135deg,#667eea,#764ba2)">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2>🤖 AI Predictive Maintenance</h2>
+            <p class="mb-0">ML-powered failure prevention & cost optimization</p>
+        </div>
+        <button class="btn btn-light" onclick="runAIAnalysis()">🧠 Run AI Analysis</button>
+    </div>
+</div>
+
+<!-- TRUCK SELECTION -->
+<div class="card-box">
+    <h5>🚛 Select Vehicle</h5>
+    <select id="truckSelect" class="form-select" onchange="loadTruckData()">
+        <option value="">Loading trucks...</option>
+    </select>
+</div>
+
+<!-- HEALTH OVERVIEW -->
+<div class="card-box">
+    <div class="row align-items-center">
+        <div class="col-md-4 text-center">
+            <h1 id="healthScore">--</h1>
+            <span id="healthStatus" class="badge bg-secondary badge-health">Unknown</span>
+        </div>
+        <div class="col-md-8">
+            <div class="row text-center">
+                <div class="col">
+                    <h5 id="mileage">--</h5>
+                    <small>Mileage (km)</small>
+                </div>
+                <div class="col">
+                    <h5 id="lastService">--</h5>
+                    <small>Days Since Service</small>
+                </div>
+                <div class="col">
+                    <h5 id="componentCount">--</h5>
+                    <small>Components</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- COMPONENT HEALTH -->
+<div class="card-box">
+    <h5>⚙️ Component Health</h5>
+    <div id="componentsGrid"></div>
+</div>
+
+<!-- FAILURE PROBABILITY -->
+<div class="card-box">
+    <h5>📊 Failure Probability (Next 30 Days)</h5>
+    <div style="height:260px">
+        <canvas id="failureChart"></canvas>
+    </div>
+</div>
+
+<!-- AI RECOMMENDATIONS -->
+<div class="card-box">
+    <h5>🧠 AI Maintenance Recommendations</h5>
+    <div id="recommendations"></div>
+</div>
+
+<!-- COST SAVINGS -->
+<div class="card-box text-center bg-success text-white">
+    <h3>💰 Estimated Savings</h3>
+    <div class="row mt-3">
+        <div class="col"><h4 id="monthlySavings">₹0</h4><small>Monthly</small></div>
+        <div class="col"><h4 id="yearlySavings">₹0</h4><small>Yearly</small></div>
+        <div class="col"><h4 id="downtimeSaved">0</h4><small>Hours Saved</small></div>
+    </div>
+</div>
+
+<!-- ACTIONS -->
+<div class="text-center mt-4">
+    <button class="btn btn-outline-primary me-2" onclick="exportPDF()">📥 Export PDF</button>
+    <a href="/" class="btn btn-primary">← Back to Dashboard</a>
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+let chart;
+let currentTruck = null;
+
+/* ---------------------------
+   LOAD TRUCKS (DB-DRIVEN)
+----------------------------*/
+fetch('/api/predictive/trucks')
+.then(res => res.json())
+.then(data => {
+    const select = document.getElementById('truckSelect');
+    select.innerHTML = '<option value="">Select Truck</option>';
+    data.forEach(t => {
+        select.innerHTML += `<option value="${t.truck_id}">${t.truck_id}</option>`;
+    });
+});
+
+/* ---------------------------
+   LOAD TRUCK DATA
+----------------------------*/
+function loadTruckData(){
+    currentTruck = document.getElementById('truckSelect').value;
+    if(!currentTruck) return;
+
+    fetch(`/api/predictive/analyze/${currentTruck}`)
+    .then(res => res.json())
+    .then(data => renderDashboard(data));
+}
+
+/* ---------------------------
+   RENDER DASHBOARD
+----------------------------*/
+function renderDashboard(data){
+    document.getElementById('healthScore').innerText = data.overall_health + '%';
+    document.getElementById('healthStatus').innerText = data.status;
+    document.getElementById('healthStatus').className =
+        'badge bg-' + (data.status === 'Healthy' ? 'success' : data.status === 'Warning' ? 'warning' : 'danger');
+
+    document.getElementById('mileage').innerText = data.mileage;
+    document.getElementById('lastService').innerText = data.last_service_days;
+    document.getElementById('componentCount').innerText = Object.keys(data.components).length;
+
+    // Components
+    let html = '';
+    Object.entries(data.components).forEach(([k,v]) => {
+        html += `
+        <div class="p-3 mb-2 border rounded">
+            <strong>${k.toUpperCase()}</strong>
+            <div class="progress mt-1">
+                <div class="progress-bar ${v.health>=80?'bg-success':v.health>=60?'bg-warning':'bg-danger'}"
+                     style="width:${v.health}%">${v.health}%</div>
+            </div>
+        </div>`;
+    });
+    document.getElementById('componentsGrid').innerHTML = html;
+
+    // Chart
+    if(chart) chart.destroy();
+    chart = new Chart(document.getElementById('failureChart'), {
+        type:'bar',
+        data:{
+            labels:Object.keys(data.components),
+            datasets:[{
+                data:Object.values(data.components).map(c=>100-c.health),
+                backgroundColor:'#ef4444'
+            }]
+        },
+        options:{responsive:true,maintainAspectRatio:false}
+    });
+
+    // Recommendations
+    let rec = '';
+    data.recommendations.forEach(r=>{
+        rec += `<div class="p-3 bg-light rounded mb-2">
+        🔧 <strong>${r.component}</strong> → Service in ${r.days} days (₹${r.cost})
+        </div>`;
+    });
+    document.getElementById('recommendations').innerHTML = rec;
+
+    document.getElementById('monthlySavings').innerText = '₹'+data.savings.monthly;
+    document.getElementById('yearlySavings').innerText = '₹'+data.savings.yearly;
+    document.getElementById('downtimeSaved').innerText = data.savings.hours;
+}
+
+/* ---------------------------
+   RUN AI ANALYSIS
+----------------------------*/
+function runAIAnalysis(){
+    if(!currentTruck){ alert('Select a truck first'); return; }
+    loadTruckData();
+}
+
+/* ---------------------------
+   EXPORT PDF
+----------------------------*/
+function exportPDF(){
+    const element = document.querySelector('.container');
+    html2pdf().set({
+        filename:`Predictive_Maintenance_${currentTruck}.pdf`,
+        margin:0.5
+    }).from(element).save();
+}
+</script>
+
+{% endblock %}

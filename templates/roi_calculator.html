@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}ROI Calculator | Smart Waste Optimization{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="card text-white mb-4 shadow border-0" style="background: linear-gradient(135deg,#2563eb,#4f46e5); border-radius:15px;">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="fw-bold mb-1"><i class="bi bi-calculator"></i> ROI Calculator – Bhubaneswar</h1>
+                <p class="mb-0 text-white-50">AI-Powered Financial & Environmental Analysis</p>
+            </div>
+            <button onclick="exportToPDF()" class="btn btn-light fw-bold px-4 shadow-sm">
+                <i class="bi bi-file-earmark-pdf"></i> Export Report
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-body">
+            <h5 class="fw-bold mb-3 text-primary"><i class="bi bi-sliders"></i> System Parameters</h5>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold uppercase">City Scope</label>
+                    <select id="city" class="form-select border-2">
+                        <option value="bhubaneswar">Bhubaneswar</option>
+                        <option value="cuttack">Cuttack</option>
+                        <option value="puri">Puri</option>
+                        <option value="rourkela">Rourkela</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold uppercase">Total Bins</label>
+                    <input type="number" id="bins" class="form-control border-2" value="100" min="1">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold uppercase">Fuel Price (₹/L)</label>
+                    <input type="number" id="fuel" class="form-control border-2" value="100">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold uppercase">Labor (₹/Hr)</label>
+                    <input type="number" id="labor" class="form-control border-2" value="500">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card text-white shadow-sm border-0" style="background: #16a34a; border-radius:15px;">
+                <div class="card-body">
+                    <p class="small mb-1 text-white-50">Annual Savings</p>
+                    <h3 id="annualSavings" class="fw-bold mb-0">₹0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white shadow-sm border-0" style="background: #2563eb; border-radius:15px;">
+                <div class="card-body">
+                    <p class="small mb-1 text-white-50">Payback Time</p>
+                    <h3 id="payback" class="fw-bold mb-0">0</h3>
+                    <small>Months</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white shadow-sm border-0" style="background: #7c3aed; border-radius:15px;">
+                <div class="card-body">
+                    <p class="small mb-1 text-white-50">5-Year ROI</p>
+                    <h3 id="roi" class="fw-bold mb-0">0%</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white shadow-sm border-0" style="background: #f97316; border-radius:15px;">
+                <div class="card-body">
+                    <p class="small mb-1 text-white-50">CO₂ Reduction</p>
+                    <h3 id="trees" class="fw-bold mb-0">0</h3>
+                    <small>Trees Equivalent</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">Savings Breakdown</h6>
+                    <div style="height: 300px;"><canvas id="savingsChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">10-Year Profit Projection (₹)</h6>
+                    <div style="height: 300px;"><canvas id="roiProjectionChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <h6 class="fw-bold mb-3 text-primary">Ward-wise Financial Performance</h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Ward</th>
+                            <th class="text-center">Bins</th>
+                            <th class="text-center">Annual Savings (₹)</th>
+                            <th class="text-center">CO₂ Saved (kg)</th>
+                            <th class="text-center">Efficiency</th>
+                        </tr>
+                    </thead>
+                    <tbody id="wardTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="background: #fffbeb; border-left: 5px solid #f59e0b;">
+        <div class="card-body">
+            <h5 class="fw-bold text-warning-emphasis"><i class="bi bi-lightbulb"></i> AI Recommendation</h5>
+            <p id="recommendation" class="mb-0 text-dark"></p>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    const wards = [
+        { name: 'Unit-1', bins: 8, type: 'commercial', wasteFactor: 1.4 },
+        { name: 'Saheed Nagar', bins: 12, type: 'residential', wasteFactor: 1.0 },
+        { name: 'Patia (KIIT)', bins: 15, type: 'commercial', wasteFactor: 1.5 },
+        { name: 'Old Town', bins: 10, type: 'residential', wasteFactor: 0.9 },
+        { name: 'Chandrasekharpur', bins: 13, type: 'residential', wasteFactor: 1.1 }
+    ];
+
+    let myCharts = {};
+
+    function initOrUpdateChart(id, config) {
+        if (myCharts[id]) {
+            myCharts[id].destroy();
+        }
+        const ctx = document.getElementById(id).getContext('2d');
+        myCharts[id] = new Chart(ctx, config);
+    }
+
+    function calculateROI() {
+        const bins = +document.getElementById("bins").value || 1;
+        const fuel = +document.getElementById("fuel").value || 1;
+        const labor = +document.getElementById("labor").value || 1;
+
+        // Financial Logic
+        const tradFuel = bins * 3 * 2 * 52 * 0.3 * fuel;
+        const tradLabor = bins * 3 * 52 * 0.25 * labor;
+        const totalTrad = tradFuel + tradLabor;
+
+        const smartFuel = tradFuel * 0.54;
+        const smartLabor = tradLabor * 0.54;
+        const totalSmart = smartFuel + smartLabor;
+
+        const yearlySavings = totalTrad - totalSmart;
+        const investment = bins * 6000 + 300000;
+        const maintenance = bins * 500;
+        const payback = investment / (yearlySavings / 12);
+        const roi = ((yearlySavings * 5 - investment) / investment) * 100;
+        const co2 = (tradFuel - smartFuel) * 2.31;
+
+        // Update UI
+        document.getElementById("annualSavings").innerText = "₹" + Math.round(yearlySavings).toLocaleString("en-IN");
+        document.getElementById("payback").innerText = payback.toFixed(1);
+        document.getElementById("roi").innerText = roi.toFixed(0) + "%";
+        document.getElementById("trees").innerText = Math.round(co2 / 21);
+
+        document.getElementById("recommendation").innerText = `Implementing this system in Bhubaneswar is highly viable. Your payback period is approximately ${payback.toFixed(1)} months with a 5-year ROI of ${roi.toFixed(0)}%.`;
+
+        // Charts
+        renderCharts(yearlySavings, tradFuel - smartFuel, tradLabor - smartLabor, investment, maintenance);
+        renderTable(bins, yearlySavings, co2);
+    }
+
+    function renderCharts(savings, fSave, lSave, invest, maint) {
+        // Doughnut
+        initOrUpdateChart('savingsChart', {
+            type: 'doughnut',
+            data: {
+                labels: ['Fuel Savings', 'Labor Savings'],
+                datasets: [{
+                    data: [fSave, lSave],
+                    backgroundColor: ['#10b981', '#3b82f6']
+                }]
+            },
+            options: { maintainAspectRatio: false }
+        });
+
+        // Projection
+        let labels = [];
+        let data = [];
+        let cumm = -invest;
+        for (let i = 1; i <= 10; i++) {
+            labels.push("Year " + i);
+            cumm += (savings - maint) * (1 + (i * 0.02)); // 2% efficiency growth
+            data.push(cumm);
+        }
+
+        initOrUpdateChart('roiProjectionChart', {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Net Profit',
+                    data: data,
+                    borderColor: '#7c3aed',
+                    fill: true,
+                    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: { maintainAspectRatio: false }
+        });
+    }
+
+    function renderTable(totalBins, totalSavings, totalCO2) {
+        const tbody = document.getElementById("wardTable");
+        tbody.innerHTML = wards.map(w => {
+            const wBins = Math.round(totalBins * (w.bins / 100));
+            const wSavings = (totalSavings / totalBins) * wBins * w.wasteFactor;
+            return `<tr>
+                <td><strong>${w.name}</strong> <span class="badge bg-light text-dark">${w.type}</span></td>
+                <td class="text-center">${wBins}</td>
+                <td class="text-center text-success fw-bold">₹${Math.round(wSavings).toLocaleString("en-IN")}</td>
+                <td class="text-center">${Math.round((totalCO2/totalBins)*wBins).toLocaleString()}</td>
+                <td class="text-center">${(w.wasteFactor * 100).toFixed(0)}%</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function exportToPDF() { window.print(); }
+
+    document.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('input', calculateROI);
+    });
+
+    window.onload = calculateROI;
+</script>
+
+<style>
+    body { background-color: #f8fafc; }
+    .card { border-radius: 12px; }
+    .form-control:focus { box-shadow: none; border-color: #2563eb; }
+    @media print {
+        .btn, .form-select, .form-control { display: none; }
+        .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+    }
+</style>
+{% endblock %}

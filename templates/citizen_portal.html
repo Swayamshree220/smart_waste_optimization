@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+{% block title %}Citizen Portal | Smart Waste{% endblock %}
+
+{% block content %}
+<style>
+.hero-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 60px 20px;
+    border-radius: 20px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.complaint-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.complaint-form {
+    background: #f8f9fa;
+    padding: 25px;
+    border-radius: 10px;
+}
+
+.issue-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 15px 0;
+    border-left: 5px solid #667eea;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.issue-card:hover {
+    transform: translateX(5px);
+}
+
+.status-badge {
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-progress { background: #dbeafe; color: #1e40af; }
+.status-resolved { background: #d1fae5; color: #065f46; }
+
+.leaderboard-card {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+}
+
+.reward-badge {
+    background: white;
+    color: #f5576c;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    margin: 10px 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.stat-box {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.file-upload-area {
+    border: 3px dashed #667eea;
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.file-upload-area:hover {
+    background: #f8f9fa;
+    border-color: #764ba2;
+}
+
+.achievement-badge {
+    display: inline-block;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: white;
+    border-radius: 25px;
+    margin: 5px;
+    font-weight: bold;
+}
+</style>
+
+<div class="container py-4">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-users"></i> 🇮🇳 Swachh Bhubaneswar Portal
+        </h1>
+        <p class="lead mb-4">Report waste issues, track progress, earn rewards!</p>
+        <div class="stats-grid" style="max-width: 800px; margin: 0 auto;">
+            <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
+                <h2 id="totalComplaints">247</h2>
+                <p class="mb-0">Total Reports</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
+                <h2 id="resolvedComplaints">198</h2>
+                <p class="mb-0">Resolved</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
+                <h2 id="avgTime">4.2</h2>
+                <p class="mb-0">Avg Days</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
+                <h2 id="activeUsers">1,234</h2>
+                <p class="mb-0">Active Citizens</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column - Report Issue -->
+        <div class="col-md-7">
+            <div class="complaint-card">
+                <h4 class="mb-4">
+                    <i class="fas fa-bullhorn"></i> Report Waste Issue
+                </h4>
+                
+                <form id="complaintForm" class="complaint-form">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Your Name</strong></label>
+                        <input type="text" class="form-control" id="userName" placeholder="Enter your name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Mobile Number</strong></label>
+                        <input type="tel" class="form-control" id="userMobile" placeholder="10-digit mobile" pattern="[0-9]{10}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Issue Type</strong></label>
+                        <select class="form-control" id="issueType" required>
+                            <option value="">Select issue type</option>
+                            <option value="overflowing">🗑️ Overflowing Bin</option>
+                            <option value="missed">❌ Missed Collection</option>
+                            <option value="damaged">🔨 Damaged Bin</option>
+                            <option value="illegal">⚠️ Illegal Dumping</option>
+                            <option value="smell">💨 Bad Smell</option>
+                            <option value="other">📝 Other</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Ward/Area</strong></label>
+                        <select class="form-control" id="ward" required>
+                            <option value="">Select your ward</option>
+                            <option value="unit1">Unit-1 (Master Canteen)</option>
+                            <option value="saheed">Saheed Nagar</option>
+                            <option value="patia">Patia (KIIT Campus)</option>
+                            <option value="oldtown">Old Town (Lingaraj)</option>
+                            <option value="nayapalli">Nayapalli</option>
+                            <option value="irc">IRC Village</option>
+                            <option value="chandrasekharpur">Chandrasekharpur</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Description</strong></label>
+                        <textarea class="form-control" id="description" rows="4" 
+                                  placeholder="Describe the issue in detail..." required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Upload Photo</strong></label>
+                        <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-camera fa-3x mb-3 text-muted"></i>
+                            <p class="mb-0">Click to upload photo (optional)</p>
+                            <small class="text-muted">Helps us resolve faster!</small>
+                            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                        </div>
+                        <div id="filePreview" class="mt-2"></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="fas fa-paper-plane"></i> Submit Complaint
+                    </button>
+                </form>
+
+                <div class="mt-4 text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-shield-alt"></i> Your information is secure and will only be used for complaint resolution
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Rewards & Recent -->
+        <div class="col-md-5">
+            <!-- Rewards Section -->
+            <div class="leaderboard-card mb-4">
+                <h5 class="mb-3">
+                    <i class="fas fa-trophy"></i> 🏆 Your Swachh Score
+                </h5>
+                <div class="reward-badge">
+                    <h2 class="mb-0">750</h2>
+                    <p class="mb-0">Points Earned</p>
+                </div>
+                <div class="mt-3">
+                    <p class="mb-2"><strong>Achievements:</strong></p>
+                    <span class="achievement-badge">🥇 5 Reports</span>
+                    <span class="achievement-badge">⭐ Verified Citizen</span>
+                    <span class="achievement-badge">🎯 Fast Responder</span>
+                </div>
+                <div class="mt-3">
+                    <small>Redeem points for:</small><br>
+                    <small>• BMC Tax Discount • Gift Vouchers • Certificates</small>
+                </div>
+            </div>
+
+            <!-- Recent Complaints -->
+            <div class="complaint-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-history"></i> Recent Reports
+                </h5>
+                <div id="recentComplaints"></div>
+            </div>
+
+            <!-- Leaderboard -->
+            <div class="complaint-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-star"></i> Top Contributors
+                </h5>
+                <div id="leaderboard"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- All Complaints Section -->
+    <div class="complaint-card">
+        <h4 class="mb-4">
+            <i class="fas fa-list"></i> All Citizen Reports
+        </h4>
+        <div class="mb-3">
+            <button class="btn btn-sm btn-outline-primary" onclick="filterComplaints('all')">All</button>
+            <button class="btn btn-sm btn-outline-warning" onclick="filterComplaints('pending')">Pending</button>
+            <button class="btn btn-sm btn-outline-info" onclick="filterComplaints('progress')">In Progress</button>
+            <button class="btn btn-sm btn-outline-success" onclick="filterComplaints('resolved')">Resolved</button>
+        </div>
+        <div id="allComplaints"></div>
+    </div>
+</div>
+
+<script>
+// Sample complaints data
+let complaints = [
+    { id: 'CMP001', name: 'Rajesh Kumar', ward: 'Saheed Nagar', type: 'overflowing', status: 'resolved', date: '2 days ago', points: 50 },
+    { id: 'CMP002', name: 'Priya Patel', ward: 'Patia', type: 'missed', status: 'progress', date: '1 day ago', points: 50 },
+    { id: 'CMP003', name: 'Amit Das', ward: 'Unit-1', type: 'damaged', status: 'pending', date: '3 hours ago', points: 50 },
+    { id: 'CMP004', name: 'Sneha Mishra', ward: 'Old Town', type: 'illegal', status: 'resolved', date: '5 days ago', points: 75 },
+    { id: 'CMP005', name: 'Bikash Sahoo', ward: 'Nayapalli', type: 'smell', status: 'progress', date: '12 hours ago', points: 50 }
+];
+
+let currentFilter = 'all';
+
+// Handle form submission
+document.getElementById('complaintForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const newComplaint = {
+        id: 'CMP' + String(complaints.length + 1).padStart(3, '0'),
+        name: document.getElementById('userName').value,
+        ward: document.getElementById('ward').options[document.getElementById('ward').selectedIndex].text,
+        type: document.getElementById('issueType').value,
+        status: 'pending',
+        date: 'Just now',
+        points: 50,
+        description: document.getElementById('description').value
+    };
+    
+    complaints.unshift(newComplaint);
+    
+    // Show success message
+    showSuccessMessage(newComplaint);
+    
+    // Reset form
+    this.reset();
+    document.getElementById('filePreview').innerHTML = '';
+    
+    // Update displays
+    displayAllComplaints();
+    displayRecentComplaints();
+    updateStats();
+});
+
+// File upload preview
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const preview = document.getElementById('filePreview');
+        preview.innerHTML = `
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> 
+                <strong>${file.name}</strong> selected
+            </div>
+        `;
+    }
+});
+
+function showSuccessMessage(complaint) {
+    const message = document.createElement('div');
+    message.className = 'alert alert-success alert-dismissible fade show';
+    message.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 400px;';
+    message.innerHTML = `
+        <strong>✅ Complaint Registered Successfully!</strong><br>
+        Complaint ID: <strong>${complaint.id}</strong><br>
+        <small>You earned 50 Swachh Points! 🌟</small><br>
+        <small>We'll resolve this within 48 hours.</small>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(message);
+    
+    // Play success sound
+    playSound('success');
+    
+    setTimeout(() => message.remove(), 8000);
+}
+
+function displayAllComplaints() {
+    const container = document.getElementById('allComplaints');
+    const filtered = currentFilter === 'all' ? complaints : 
+                    complaints.filter(c => c.status === currentFilter);
+    
+    container.innerHTML = filtered.map(c => {
+        const statusClass = `status-${c.status}`;
+        const statusText = c.status === 'resolved' ? '✅ Resolved' :
+                          c.status === 'progress' ? '🔄 In Progress' : '⏳ Pending';
+        const typeIcon = getIssueIcon(c.type);
+        
+        return `
+            <div class="issue-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-2">
+                            <h6 class="mb-0 me-3">${typeIcon} ${c.id}</h6>
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                        <p class="mb-1">
+                            <strong>Reporter:</strong> ${c.name} | 
+                            <strong>Ward:</strong> ${c.ward}
+                        </p>
+                        <small class="text-muted">
+                            <i class="fas fa-clock"></i> ${c.date}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge bg-success">+${c.points} pts</div>
+                    </div>
+                </div>
+                ${c.description ? `<p class="mt-2 mb-0 text-muted small">${c.description}</p>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function displayRecentComplaints() {
+    const container = document.getElementById('recentComplaints');
+    const recent = complaints.slice(0, 3);
+    
+    container.innerHTML = recent.map(c => {
+        const statusClass = `status-${c.status}`;
+        return `
+            <div style="padding: 10px; border-bottom: 1px solid #dee2e6;">
+                <div class="d-flex justify-content-between">
+                    <strong>${c.id}</strong>
+                    <span class="status-badge ${statusClass} px-2 py-1" style="font-size: 0.75em;">
+                        ${c.status}
+                    </span>
+                </div>
+                <small class="text-muted">${c.ward} • ${c.date}</small>
+            </div>
+        `;
+    }).join('');
+}
+
+function displayLeaderboard() {
+    const container = document.getElementById('leaderboard');
+    const topUsers = [
+        { name: 'Rajesh Kumar', points: 850, reports: 17 },
+        { name: 'Priya Patel', points: 750, reports: 15 },
+        { name: 'Amit Das', points: 620, reports: 12 }
+    ];
+    
+    container.innerHTML = topUsers.map((user, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+        return `
+            <div style="padding: 10px; border-bottom: 1px solid #dee2e6;">
+                <div class="d-flex justify-content-between">
+                    <span>${medal} <strong>${user.name}</strong></span>
+                    <span class="badge bg-primary">${user.points} pts</span>
+                </div>
+                <small class="text-muted">${user.reports} reports filed</small>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateStats() {
+    document.getElementById('totalComplaints').textContent = complaints.length;
+    document.getElementById('resolvedComplaints').textContent = 
+        complaints.filter(c => c.status === 'resolved').length;
+}
+
+function filterComplaints(status) {
+    currentFilter = status;
+    displayAllComplaints();
+}
+
+function getIssueIcon(type) {
+    const icons = {
+        overflowing: '🗑️',
+        missed: '❌',
+        damaged: '🔨',
+        illegal: '⚠️',
+        smell: '💨',
+        other: '📝'
+    };
+    return icons[type] || '📝';
+}
+
+function playSound(type) {
+    const audio = new Audio();
+    if (type === 'success') {
+        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVqzn77BdGAg+ltryxm4gBSuBzvLaizsIGGS57OihUhELTKXh8bllHAU2jdXy0H0qBSZ7yO/ekD0LFF60';
+    }
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log('Audio play failed'));
+}
+
+// Initialize on load
+window.addEventListener('load', () => {
+    displayAllComplaints();
+    displayRecentComplaints();
+    displayLeaderboard();
+    updateStats();
+});
+</script>
+
+{% endblock %}

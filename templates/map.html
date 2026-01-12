@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 600px;
+        width: 100%;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        z-index: 1;
+    }
+    
+    .map-controls {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .legend {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-top: 20px;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 8px 0;
+    }
+    
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 10px;
+        border: 2px solid #333;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>🗺️ Bhubaneswar Waste Collection Map</h3>
+    <p>Interactive map showing waste collection bins across Bhubaneswar with real-time predictions.</p>
+    <p style="color: #666; font-size: 0.9em;">
+        <strong>📍 Location:</strong> Bhubaneswar, Odisha, India | 
+        <strong>🗑️ Bins:</strong> {{ bins|length }} collection points |
+        <strong>🏢 Depot:</strong> BMC Central Depot, Unit-1
+    </p>
+    
+    <div class="map-controls">
+        <button onclick="predictAndShowOnMap()" class="btn btn-success">
+            🔮 Predict & Show Waste Levels
+        </button>
+        <button onclick="showAllBins()" class="btn">
+            📍 Show All Bins
+        </button>
+        <button onclick="showOnlyHighPriority()" class="btn btn-warning">
+            ⚠️ Show High Priority Only
+        </button>
+        <button onclick="fitMapToBins()" class="btn">
+            🎯 Fit to View
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div id="map"></div>
+</div>
+
+<div class="card">
+    <h3>📊 Map Statistics</h3>
+    <div id="mapStats" class="grid">
+        <div class="metric">
+            <div class="metric-label">Total Bins</div>
+            <div class="metric-value">{{ bins|length }}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Bhubaneswar Wards</div>
+            <div class="metric-value">30</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">High Priority</div>
+            <div class="metric-value" id="highPriorityCount">-</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Total Predicted Waste</div>
+            <div class="metric-value" id="totalWaste">-</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="legend">
+        <h4 style="margin-bottom: 15px;">🎨 Map Legend</h4>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #2ecc71;"></div>
+            <span><strong>Green:</strong> Low fill level (0-50%) - No action needed</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f39c12;"></div>
+            <span><strong>Orange:</strong> Medium fill level (50-70%) - Monitor</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e74c3c;"></div>
+            <span><strong>Red:</strong> High priority (70-100%) - Collect immediately</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #3498db;"></div>
+            <span><strong>Blue:</strong> BMC Central Depot (Unit-1, Bhubaneswar)</span>
+        </div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+            <p><strong>Area Types:</strong></p>
+            <p>🏠 Residential | 🏢 Commercial | 🏭 Industrial</p>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info" style="margin-top: 20px;">
+    <strong>ℹ️ About This Map:</strong> This map uses OpenStreetMap (free, no API key required). 
+    Shows real Bhubaneswar wards including Saheed Nagar, Patia (KIIT Campus), Old Town (Lingaraj), 
+    IRC Village, Unit-1 to Unit-5, and more. Click on markers to see detailed ward information.
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map;
+let markers = [];
+let depot = {{ depot | tojson }};
+let bins = {{ bins | tojson }};
+let depotMarker;
+let markerGroup;
+
+// Initialize Map
+function initMap() {
+    // Create map centered on Bhubaneswar
+    map = L.map('map').setView([20.2961, 85.8245], 12);
+    
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+    
+    // Create layer group for markers
+    markerGroup = L.layerGroup().addTo(map);
+    
+    // Add depot marker
+    addDepotMarker();
+    
+    // Show all bins initially
+    showAllBins();
+}
+
+function addDepotMarker() {
+    depotMarker = L.circleMarker([depot.lat, depot.lon], {
+        radius: 12,
+        fillColor: '#3498db',
+        color: '#fff',
+        weight: 3,
+        fillOpacity: 1
+    }).addTo(markerGroup);
+    
+    depotMarker.bindPopup(`
+        <div style="font-family: Arial; max-width: 200px;">
+            <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🏢 ${depot.name}</h4>
+            <p style="margin: 5px 0;"><strong>Type:</strong> Central Depot</p>
+            <p style="margin: 5px 0;"><strong>Location:</strong> ${depot.lat.toFixed(4)}, ${depot.lon.toFixed(4)}</p>
+            <p style="margin: 5px 0; color: #3498db;"><strong>Bhubaneswar, Odisha</strong></p>
+        </div>
+    `);
+}
+
+function showAllBins() {
+    clearMarkers();
+    
+    bins.forEach(bin => {
+        addBinMarker(bin, '#95a5a6'); // Default gray color
+    });
+    
+    fitMapToBins();
+}
+
+function addBinMarker(bin, color) {
+    const fillLevel = bin.predicted_waste ? (bin.predicted_waste / bin.capacity * 100) : 0;
+    
+    const marker = L.circleMarker([bin.location[0], bin.location[1]], {
+        radius: 8,
+        fillColor: color,
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.8
+    }).addTo(markerGroup);
+    
+    const typeIcon = bin.type === 'residential' ? '🏠' : 
+                     bin.type === 'commercial' ? '🏢' : '🏭';
+    
+    const popupContent = `
+        <div style="font-family: Arial; max-width: 250px;">
+            <h4 style="margin: 0 0 10px 0; color: #2c3e50;">${typeIcon} ${bin.ward_name}</h4>
+            <p style="margin: 5px 0;"><strong>Bin ID:</strong> ${bin.id}</p>
+            <p style="margin: 5px 0;"><strong>Type:</strong> ${bin.type.charAt(0).toUpperCase() + bin.type.slice(1)}</p>
+            <p style="margin: 5px 0;"><strong>Address:</strong> ${bin.address}</p>
+            ${bin.predicted_waste ? `
+                <hr style="margin: 10px 0;">
+                <p style="margin: 5px 0;"><strong>Predicted Waste:</strong> ${bin.predicted_waste.toFixed(2)} kg</p>
+                <p style="margin: 5px 0;"><strong>Fill Level:</strong> ${fillLevel.toFixed(1)}%</p>
+                <p style="margin: 5px 0;"><strong>Status:</strong> 
+                    ${fillLevel > 70 ? '<span style="color: #e74c3c;">🔴 Collect Now</span>' : 
+                      fillLevel > 50 ? '<span style="color: #f39c12;">🟡 Monitor</span>' : 
+                      '<span style="color: #2ecc71;">🟢 OK</span>'}
+                </p>
+            ` : '<p style="margin: 10px 0; color: #999;"><em>Run prediction to see waste levels</em></p>'}
+        </div>
+    `;
+    
+    marker.bindPopup(popupContent);
+    markers.push(marker);
+}
+
+function clearMarkers() {
+    markerGroup.clearLayers();
+    markers = [];
+    addDepotMarker(); // Re-add depot
+}
+
+async function predictAndShowOnMap() {
+    // Show loading
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Predicting...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/predict', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({date: new Date().toISOString()})
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update bins with predictions
+            bins = data.bins;
+            
+            // Clear existing markers
+            clearMarkers();
+            
+            // Add markers with colors based on fill level
+            let highPriorityCount = 0;
+            let totalWaste = 0;
+            
+            bins.forEach(bin => {
+                const fillLevel = bin.predicted_waste / bin.capacity * 100;
+                let color;
+                
+                if (fillLevel > 70) {
+                    color = '#e74c3c'; // Red
+                    highPriorityCount++;
+                } else if (fillLevel > 50) {
+                    color = '#f39c12'; // Orange
+                } else {
+                    color = '#2ecc71'; // Green
+                }
+                
+                totalWaste += bin.predicted_waste;
+                addBinMarker(bin, color);
+            });
+            
+            // Update statistics
+            document.getElementById('highPriorityCount').textContent = highPriorityCount;
+            document.getElementById('totalWaste').textContent = totalWaste.toFixed(0) + ' kg';
+            
+            // Show alert
+            setTimeout(() => {
+                alert(`✅ Predictions Complete!\n\n` +
+                      `High priority bins: ${highPriorityCount}\n` +
+                      `Total waste: ${totalWaste.toFixed(0)} kg\n` +
+                      `Location: Bhubaneswar, Odisha`);
+            }, 500);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error running predictions. Please try again.');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+function showOnlyHighPriority() {
+    if (!bins[0].predicted_waste) {
+        alert('⚠️ Please run predictions first!\n\nClick "Predict & Show Waste Levels" button.');
+        return;
+    }
+    
+    clearMarkers();
+    
+    let count = 0;
+    bins.forEach(bin => {
+        const fillLevel = bin.predicted_waste / bin.capacity * 100;
+        if (fillLevel > 70) {
+            addBinMarker(bin, '#e74c3c');
+            count++;
+        }
+    });
+    
+    if (count === 0) {
+        alert('✅ No high priority bins!\n\nAll bins are below 70% capacity.');
+        showAllBins();
+    } else {
+        fitMapToBins();
+        alert(`🔴 Showing ${count} high priority bins\n\nThese bins need immediate collection.`);
+    }
+}
+
+function fitMapToBins() {
+    if (markers.length === 0) return;
+    
+    const bounds = [];
+    
+    // Include depot
+    bounds.push([depot.lat, depot.lon]);
+    
+    // Include all visible markers
+    markers.forEach(marker => {
+        bounds.push(marker.getLatLng());
+    });
+    
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, {padding: [50, 50]});
+    }
+}
+
+// Initialize on page load
+window.addEventListener('load', () => {
+    initMap();
+    
+    // Show welcome message
+    setTimeout(() => {
+        if (window.matchMedia('(min-width: 768px)').matches) {
+            alert('🗺️ Welcome to Bhubaneswar Waste Collection Map!\n\n' +
+                  '📍 Showing 30 real Bhubaneswar wards\n' +
+                  '🔮 Click "Predict & Show Waste Levels" to see predictions\n' +
+                  '📊 Click any marker for detailed information\n\n' +
+                  'Location: Bhubaneswar, Odisha, India');
+        }
+    }, 1000);
+});
+</script>
+{% endblock %}

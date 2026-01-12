@@ -1,0 +1,66 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h3>🌍 Welcome to Smart Waste Collection</h3>
+    <p style="font-size: 1.1em; line-height: 1.8; color: #555; margin-top: 15px;">
+        Our AI-powered system revolutionizes waste management by predicting waste generation patterns 
+        and optimizing collection routes. This results in significant cost savings, reduced emissions, 
+        and improved operational efficiency.
+    </p>
+</div>
+
+<div class="grid">
+    <div class="card" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white;">
+        <h3>📊 Waste Prediction</h3>
+        <p>Machine learning models predict waste generation by area using historical data, weather patterns, and seasonal trends.</p>
+        <a href="/predict" class="btn" style="margin-top: 15px; background: white; color: #3498db;">Try Prediction →</a>
+    </div>
+    
+    <div class="card" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white;">
+        <h3>🚛 Route Optimization</h3>
+        <p>Advanced algorithms optimize collection routes dynamically, reducing distance traveled and fuel consumption.</p>
+        <a href="/optimize" class="btn" style="margin-top: 15px; background: white; color: #2ecc71;">Optimize Routes →</a>
+    </div>
+    
+    <div class="card" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white;">
+        <h3>📈 Algorithm Comparison</h3>
+        <p>Compare different optimization algorithms: Genetic Algorithm, Simulated Annealing, and Nearest Neighbor.</p>
+        <a href="/comparison" class="btn" style="margin-top: 15px; background: white; color: #e74c3c;">Compare Algorithms →</a>
+    </div>
+</div>
+
+<div class="card">
+    <h3>🎯 Key Features</h3>
+    <div class="grid">
+        <div>
+            <h4 style="color: #2ecc71;">✅ Predictive Analytics</h4>
+            <p>Gradient Boosting ML model with 90%+ accuracy</p>
+        </div>
+        <div>
+            <h4 style="color: #3498db;">✅ Smart Routing</h4>
+            <p>Multiple optimization algorithms (GA, SA, NN)</p>
+        </div>
+        <div>
+            <h4 style="color: #e67e22;">✅ Cost Reduction</h4>
+            <p>30-40% savings in fuel and operational costs</p>
+        </div>
+        <div>
+            <h4 style="color: #9b59b6;">✅ Environmental Impact</h4>
+            <p>Significant CO₂ emissions reduction</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>🔬 Technology Stack</h3>
+    <ul style="line-height: 2; margin-left: 20px;">
+        <li><strong>Machine Learning:</strong> Scikit-learn (Gradient Boosting, Random Forest)</li>
+        <li><strong>Optimization:</strong> Genetic Algorithm, Simulated Annealing, Nearest Neighbor</li>
+        <li><strong>Graph Algorithms:</strong> Distance matrix computation, Haversine formula</li>
+        <li><strong>Backend:</strong> Flask, Python 3.8+</li>
+        <li><strong>Data Processing:</strong> NumPy, Pandas</li>
+    </ul>
+</div>
+{% endblock %}

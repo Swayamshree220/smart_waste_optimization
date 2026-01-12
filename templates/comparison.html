@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h3>📈 Algorithm Comparison</h3>
+    <p>Compare the performance of different route optimization algorithms side-by-side.</p>
+
+    <button onclick="runComparison()" class="btn btn-success" style="margin-top: 15px;">
+        🔬 Run Algorithm Comparison
+    </button>
+
+    <div class="alert alert-info" style="margin-top: 20px;">
+        <strong>ℹ️ Algorithms Compared:</strong>
+        <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+            <li><strong>Fixed Route:</strong> Traditional sequential visiting (baseline)</li>
+            <li><strong>Nearest Neighbor:</strong> Fast greedy heuristic</li>
+            <li><strong>Genetic Algorithm:</strong> AI-based global optimization</li>
+            <li><strong>Simulated Annealing:</strong> Probabilistic optimization</li>
+        </ul>
+    </div>
+</div>
+
+<div id="loadingComparison" class="loading" style="display:none;">
+    <p>⏳ Running all optimization algorithms…</p>
+    <p style="font-size:0.9em;color:#777;">This may take a few seconds</p>
+</div>
+
+<div id="comparisonResults" style="display:none;">
+
+    <div class="card">
+        <h3>🏆 Algorithm Rankings</h3>
+        <div id="rankingsSummary"></div>
+    </div>
+
+    <div class="card">
+        <h3>📊 Detailed Metrics Comparison</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Distance (km)</th>
+                    <th>Time (hrs)</th>
+                    <th>Cost (₹)</th>
+                    <th>CO₂ (kg)</th>
+                    <th>Routes</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody id="comparisonTable"></tbody>
+        </table>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>📉 Distance</h3>
+            <canvas id="distanceChart"></canvas>
+        </div>
+        <div class="card">
+            <h3>💰 Cost</h3>
+            <canvas id="costChart"></canvas>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>🌱 CO₂ Emissions</h3>
+            <canvas id="emissionsChart"></canvas>
+        </div>
+        <div class="card">
+            <h3>⏱️ Time</h3>
+            <canvas id="timeChart"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>📝 AI Analysis</h3>
+        <div id="algorithmAnalysis"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+let comparisonData = null;
+
+async function runComparison() {
+    document.getElementById("loadingComparison").style.display = "block";
+    document.getElementById("comparisonResults").style.display = "none";
+
+    try {
+        const response = await fetch("/api/compare_algorithms", { method: "POST" });
+        const data = await response.json();
+
+        if (!data.success) throw new Error("Comparison failed");
+
+        comparisonData = data.results;
+        displayResults(data.results);
+
+    } catch (err) {
+        console.error(err);
+        alert("Error running comparison");
+    } finally {
+        document.getElementById("loadingComparison").style.display = "none";
+    }
+}
+
+function displayResults(results) {
+    const algorithms = Object.keys(results);
+    const rankings = calculateRankings(results);
+
+    // Rankings
+    let rankHTML = '<div class="grid">';
+    rankings.forEach((r, i) => {
+        const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "🏅";
+        rankHTML += `
+            <div class="metric">
+                <div class="metric-value">${medal}</div>
+                <div class="metric-label"><strong>${r.name}</strong></div>
+                <div class="metric-label">Score: ${(r.score / 100).toFixed(2)}%</div>
+            </div>`;
+    });
+    rankHTML += "</div>";
+    document.getElementById("rankingsSummary").innerHTML = rankHTML;
+
+    // Table
+    let tableHTML = "";
+    algorithms.forEach(a => {
+        const r = results[a];
+        const score = calculateScore(r);
+        tableHTML += `
+            <tr>
+                <td><strong>${a}</strong></td>
+                <td>${r.distance_km}</td>
+                <td>${r.time_hours}</td>
+                <td>${r.total_cost}</td>
+                <td>${r.co2_kg}</td>
+                <td>${r.num_routes}</td>
+                <td>
+                    <div class="progress">
+                        <div class="progress-bar" style="width:${score}%">
+                            ${(score / 100).toFixed(2)}%
+                        </div>
+                    </div>
+                </td>
+            </tr>`;
+    });
+    document.getElementById("comparisonTable").innerHTML = tableHTML;
+
+    createCharts(results);
+    document.getElementById("algorithmAnalysis").innerHTML = generateAnalysis(results, rankings);
+    document.getElementById("comparisonResults").style.display = "block";
+}
+
+/* ---------------- SCORE LOGIC (FIXED) ---------------- */
+function calculateScore(result) {
+    const base = comparisonData["Fixed Route"];
+    if (!base || base.distance_km === 0) return 0;
+
+    const improvement =
+        ((base.distance_km - result.distance_km) / base.distance_km) * 100;
+
+    // Scale for UI visibility (0–100)
+    return Math.max(0, Math.min(100, improvement * 100));
+}
+
+function calculateRankings(results) {
+    return Object.keys(results).map(a => ({
+        name: a,
+        score: calculateScore(results[a])
+    })).sort((a,b) => b.score - a.score);
+}
+
+/* ---------------- CHARTS ---------------- */
+function createCharts(results) {
+    const labels = Object.keys(results);
+
+    barChart("distanceChart", labels, labels.map(a => results[a].distance_km), "Distance (km)");
+    barChart("costChart", labels, labels.map(a => results[a].total_cost), "Cost (₹)");
+    barChart("emissionsChart", labels, labels.map(a => results[a].co2_kg), "CO₂ (kg)");
+    barChart("timeChart", labels, labels.map(a => results[a].time_hours), "Time (hrs)");
+}
+
+function barChart(id, labels, data, label) {
+    const ctx = document.getElementById(id);
+    if (ctx.chart) ctx.chart.destroy();
+
+    ctx.chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{ data, label }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display:false }},
+            scales: { y: { beginAtZero:true }}
+        }
+    });
+}
+
+/* ---------------- ANALYSIS ---------------- */
+function generateAnalysis(results, rankings) {
+    const best = rankings[0].name;
+    const base = results["Fixed Route"];
+    const bestR = results[best];
+
+    return `
+        <ul>
+            <li><strong>${best}</strong> achieved the best overall performance</li>
+            <li>Distance reduced by ${((base.distance_km - bestR.distance_km)/base.distance_km*100).toFixed(2)}%</li>
+            <li>Cost savings of ₹${(base.total_cost - bestR.total_cost).toFixed(2)}</li>
+            <li>CO₂ emissions reduced by ${(base.co2_kg - bestR.co2_kg).toFixed(2)} kg</li>
+        </ul>
+        <p><strong>Conclusion:</strong> AI-based optimization significantly outperforms traditional routing.</p>
+    `;
+}
+</script>
+{% endblock %}

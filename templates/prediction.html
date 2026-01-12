@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+
+    <h2 class="mb-4">📈 Waste Prediction</h2>
+    <p class="text-muted">
+        Predict daily waste generation using machine learning.
+    </p>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5>Select Date</h5>
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <input type="date" id="date" class="form-control mb-3">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary mb-3 w-100" onclick="runPrediction()">
+                        <i class="fas fa-chart-line"></i> Predict Waste
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-secondary mb-3" onclick="setToday()">Today</button>
+                    <button class="btn btn-outline-secondary mb-3 ms-2" onclick="setTomorrow()">Tomorrow</button>
+                </div>
+            </div>
+            
+            <div id="loading" class="text-center d-none">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Running AI predictions...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary" class="row mb-4 d-none">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white text-center p-3">
+                <h6>Total Waste (kg)</h6>
+                <h2 id="totalWaste">0</h2>
+                <small>Predicted for <span id="predictionDate"></span></small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white text-center p-3">
+                <h6>Average per Bin (kg)</h6>
+                <h2 id="avgWaste">0</h2>
+                <small><span id="binCount">0</span> bins total</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark text-center p-3">
+                <h6>High Priority Bins</h6>
+                <h2 id="binsCount">0</h2>
+                <small>Above 70% threshold</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white text-center p-3">
+                <h6>Prediction Method</h6>
+                <h2><i class="fas fa-robot"></i></h2>
+                <small>RandomForest AI</small>
+            </div>
+        </div>
+    </div>
+
+    <div id="chartCard" class="card mb-4 d-none">
+        <div class="card-body">
+            <h5>📊 Waste Distribution by Bin</h5>
+            <canvas id="wasteChart" height="80"></canvas>
+        </div>
+    </div>
+
+    <div class="card d-none" id="tableCard">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>🗑️ Bin-wise Predictions</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="exportToCSV()">
+                    <i class="fas fa-download"></i> Export CSV
+                </button>
+            </div>
+            <table class="table table-bordered table-hover text-center mt-3">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Bin ID</th>
+                        <th>Predicted Waste (kg)</th>
+                        <th>Fill Level (%)</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="predictionTable"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+<script>
+let predictionData = null;
+let wasteChart = null;
+
+function setToday() {
+    document.getElementById("date").value = new Date().toISOString().split("T")[0];
+}
+
+function setTomorrow() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById("date").value = tomorrow.toISOString().split("T")[0];
+}
+
+async function runPrediction() {
+    const dateInput = document.getElementById("date").value;
+    if(!dateInput) return alert("Please select a date");
+
+    // UI Reset
+    document.getElementById("loading").classList.remove("d-none");
+    document.getElementById("summary").classList.add("d-none");
+    document.getElementById("tableCard").classList.add("d-none");
+    document.getElementById("chartCard").classList.add("d-none");
+
+    try {
+        const response = await fetch("/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date: dateInput })
+        });
+        const data = await response.json();
+
+        document.getElementById("loading").classList.add("d-none");
+
+        if (data.success) {
+            renderResults(data);
+        } else {
+            alert("Error: " + data.error);
+        }
+    } catch (err) {
+        document.getElementById("loading").classList.add("d-none");
+        console.error("Fetch error:", err);
+    }
+}
+
+function renderResults(data) {
+    predictionData = data;
+    document.getElementById("summary").classList.remove("d-none");
+    document.getElementById("tableCard").classList.remove("d-none");
+    document.getElementById("chartCard").classList.remove("d-none");
+
+    document.getElementById("totalWaste").innerText = data.total_waste.toFixed(1);
+    document.getElementById("avgWaste").innerText = data.avg_waste.toFixed(1);
+    document.getElementById("binsCount").innerText = data.bins_needing_collection;
+    document.getElementById("binCount").innerText = data.bin_count;
+    document.getElementById("predictionDate").innerText = data.date;
+
+    let rows = "";
+    // Sort bins by waste level descending
+    const sortedBinIds = Object.keys(data.predictions).sort((a,b) => data.predictions[b] - data.predictions[a]);
+
+    sortedBinIds.forEach(id => {
+        const waste = data.predictions[id];
+        const fill = (waste / 100) * 100; // Assuming 100kg cap
+        const colorClass = fill >= 90 ? 'bg-danger' : (fill >= 70 ? 'bg-warning' : 'bg-success');
+        
+        rows += `
+            <tr>
+                <td><strong>BIN-${id.padStart(3, '0')}</strong></td>
+                <td>${waste.toFixed(2)} kg</td>
+                <td>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar ${colorClass}" style="width: ${fill}%">${fill.toFixed(0)}%</div>
+                    </div>
+                </td>
+                <td><span class="badge ${colorClass}">${fill >= 70 ? 'HIGH' : 'LOW'}</span></td>
+                <td><span class="text-uppercase small font-weight-bold">${fill >= 70 ? '⚠️ Collect' : '✅ OK'}</span></td>
+            </tr>`;
+    });
+    document.getElementById("predictionTable").innerHTML = rows;
+    updateChart(data.predictions);
+}
+
+function updateChart(predictions) {
+    const ctx = document.getElementById('wasteChart').getContext('2d');
+    if (wasteChart) wasteChart.destroy();
+    
+    wasteChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(predictions).map(id => `Bin ${id}`),
+            datasets: [{
+                label: 'Waste (kg)',
+                data: Object.values(predictions),
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        }
+    });
+}
+
+function exportToCSV() {
+    if (!predictionData) return;
+    let csv = "Bin ID,Waste(kg)\n" + Object.entries(predictionData.predictions).map(e => `BIN_${e[0]},${e[1]}`).join("\n");
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `predictions_${predictionData.date}.csv`;
+    a.click();
+}
+
+window.onload = setToday;
+</script>
+
+<style>
+    .card:hover { transform: translateY(-3px); transition: 0.3s; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .progress { background-color: #e9ecef; border-radius: 5px; }
+</style>
+
+{% endblock %}

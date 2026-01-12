@@ -1,0 +1,615 @@
+{% extends "base.html" %}
+{% block title %}Live Route Tracking | Smart Waste{% endblock %}
+
+{% block content %}
+<style>
+#map {
+    height: 600px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.tracking-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 20px;
+}
+
+.truck-status {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.route-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.info-card {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.info-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.info-label {
+    font-size: 0.9em;
+    color: #7f8c8d;
+    margin-top: 5px;
+}
+
+.truck-icon {
+    animation: moveTruck 2s infinite;
+}
+
+@keyframes moveTruck {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+.eta-badge {
+    background: #10b981;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.bin-list-item {
+    background: white;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 10px;
+    border-left: 5px solid #667eea;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.completed {
+    opacity: 0.6;
+    border-left-color: #10b981;
+}
+
+.current {
+    border-left-color: #f59e0b;
+    background: #fef3c7;
+}
+
+.control-panel {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.route-btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 5px;
+}
+
+.route-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.start-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.pause-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.stop-btn {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+</style>
+
+<div class="container py-4">
+    <!-- Header -->
+    <div class="tracking-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-2">
+                    <i class="fas fa-truck-moving truck-icon"></i> Live Route Tracking
+                </h1>
+                <p class="mb-0">Real-time waste collection vehicle tracking - Bhubaneswar</p>
+            </div>
+            <div class="eta-badge pulse">
+                <i class="fas fa-clock"></i> ETA: <span id="eta">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Truck Status -->
+    <div class="truck-status">
+        <h4><i class="fas fa-info-circle"></i> Truck Status: <span id="truckStatus">Ready</span></h4>
+        <div class="route-info">
+            <div class="info-card">
+                <div class="info-value" id="distanceRemaining">0</div>
+                <div class="info-label">KM Remaining</div>
+            </div>
+            <div class="info-card">
+                <div class="info-value" id="binsCollected">0</div>
+                <div class="info-label">Bins Collected</div>
+            </div>
+            <div class="info-card">
+                <div class="info-value" id="binsRemaining">0</div>
+                <div class="info-label">Bins Remaining</div>
+            </div>
+            <div class="info-card">
+                <div class="info-value" id="currentSpeed">0</div>
+                <div class="info-label">KM/H Speed</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel mb-4">
+        <h5><i class="fas fa-gamepad"></i> Route Control</h5>
+        <button class="route-btn start-btn" onclick="startRoute()">
+            <i class="fas fa-play"></i> Start Route
+        </button>
+        <button class="route-btn pause-btn" onclick="pauseRoute()">
+            <i class="fas fa-pause"></i> Pause
+        </button>
+        <button class="route-btn stop-btn" onclick="stopRoute()">
+            <i class="fas fa-stop"></i> Stop & Reset
+        </button>
+        <button class="route-btn" style="background: #3b82f6; color: white;" onclick="optimizeNewRoute()">
+            <i class="fas fa-route"></i> Optimize New Route
+        </button>
+    </div>
+
+    <div class="row">
+        <!-- Map -->
+        <div class="col-md-8">
+            <div id="map"></div>
+        </div>
+
+        <!-- Route List -->
+        <div class="col-md-4">
+            <div class="control-panel">
+                <h5><i class="fas fa-list"></i> Collection Route</h5>
+                <div id="routeList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+let map;
+let truckMarker;
+let routePolyline;
+let binMarkers = [];
+let currentRouteIndex = 0;
+let isRouteActive = false;
+let routeInterval;
+let truckPosition;
+
+// Bhubaneswar coordinates
+const DEPOT = { lat: 20.2961, lng: 85.8245, name: "BMC Depot" };
+
+// Sample optimized route (from your optimization algorithm)
+let optimizedRoute = [
+    { id: 'BIN_001', lat: 20.2970, lng: 85.8240, area: 'Unit-1', fillLevel: 85 },
+    { id: 'BIN_002', lat: 20.2980, lng: 85.8250, area: 'Saheed Nagar', fillLevel: 92 },
+    { id: 'BIN_003', lat: 20.2990, lng: 85.8230, area: 'Nayapalli', fillLevel: 78 },
+    { id: 'BIN_004', lat: 20.3000, lng: 85.8260, area: 'Patia', fillLevel: 88 },
+    { id: 'BIN_005', lat: 20.2950, lng: 85.8220, area: 'Old Town', fillLevel: 95 }
+];
+
+// Initialize map
+function initMap() {
+    map = L.map('map').setView([DEPOT.lat, DEPOT.lng], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // Add depot marker
+    L.circleMarker([DEPOT.lat, DEPOT.lng], {
+        radius: 15,
+        fillColor: '#3b82f6',
+        color: '#fff',
+        weight: 3,
+        fillOpacity: 1
+    }).addTo(map).bindPopup(`<b>🏢 ${DEPOT.name}</b><br>Starting Point`);
+    
+    // Add bin markers
+    optimizedRoute.forEach((bin, idx) => {
+        const fillColor = bin.fillLevel >= 90 ? '#ef4444' : 
+                         bin.fillLevel >= 70 ? '#f59e0b' : '#10b981';
+        
+        const marker = L.circleMarker([bin.lat, bin.lng], {
+            radius: 10,
+            fillColor: fillColor,
+            color: '#fff',
+            weight: 2,
+            fillOpacity: 0.9
+        }).addTo(map);
+        
+        marker.bindPopup(`
+            <b>🗑️ ${bin.id}</b><br>
+            📍 ${bin.area}<br>
+            📊 Fill: ${bin.fillLevel}%<br>
+            🔢 Stop #${idx + 1}
+        `);
+        
+        binMarkers.push(marker);
+    });
+    
+    // Create truck marker (custom icon using emoji)
+    truckPosition = [DEPOT.lat, DEPOT.lng];
+    truckMarker = L.marker(truckPosition, {
+        icon: L.divIcon({
+            html: '<div style="font-size: 40px; text-align: center;">🚛</div>',
+            className: 'truck-marker',
+            iconSize: [40, 40]
+        })
+    }).addTo(map);
+    
+    truckMarker.bindPopup('<b>Collection Truck</b><br>Status: Ready');
+    
+    updateRouteList();
+    calculateTotalDistance();
+}
+
+function updateRouteList() {
+    const container = document.getElementById('routeList');
+    let html = '';
+    
+    optimizedRoute.forEach((bin, idx) => {
+        const isCompleted = idx < currentRouteIndex;
+        const isCurrent = idx === currentRouteIndex;
+        const statusClass = isCompleted ? 'completed' : isCurrent ? 'current' : '';
+        const icon = isCompleted ? '✅' : isCurrent ? '🚛' : '⏳';
+        
+        html += `
+            <div class="bin-list-item ${statusClass}">
+                <div>
+                    <strong>${icon} ${bin.id}</strong><br>
+                    <small>${bin.area} - ${bin.fillLevel}% full</small>
+                </div>
+                <div>
+                    <span class="badge ${isCompleted ? 'bg-success' : isCurrent ? 'bg-warning' : 'bg-secondary'}">
+                        ${isCompleted ? 'Done' : isCurrent ? 'In Progress' : 'Pending'}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function calculateTotalDistance() {
+    let total = 0;
+    let remaining = 0;
+    
+    // Distance from depot to first bin
+    if (optimizedRoute.length > 0) {
+        total += calculateDistance(DEPOT.lat, DEPOT.lng, optimizedRoute[0].lat, optimizedRoute[0].lng);
+    }
+    
+    // Distance between bins
+    for (let i = 0; i < optimizedRoute.length - 1; i++) {
+        const dist = calculateDistance(
+            optimizedRoute[i].lat, optimizedRoute[i].lng,
+            optimizedRoute[i + 1].lat, optimizedRoute[i + 1].lng
+        );
+        total += dist;
+        
+        if (i >= currentRouteIndex) {
+            remaining += dist;
+        }
+    }
+    
+    // Distance back to depot
+    if (optimizedRoute.length > 0) {
+        const lastBin = optimizedRoute[optimizedRoute.length - 1];
+        const backToDep = calculateDistance(lastBin.lat, lastBin.lng, DEPOT.lat, DEPOT.lng);
+        total += backToDep;
+        if (currentRouteIndex >= optimizedRoute.length) {
+            remaining += backToDep;
+        }
+    }
+    
+    document.getElementById('distanceRemaining').textContent = remaining.toFixed(1);
+    document.getElementById('binsRemaining').textContent = Math.max(0, optimizedRoute.length - currentRouteIndex);
+    
+    // Calculate ETA (assuming 30 km/h average)
+    const etaMinutes = Math.ceil((remaining / 30) * 60);
+    document.getElementById('eta').textContent = etaMinutes + ' min';
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+function startRoute() {
+    if (isRouteActive) {
+        alert('⚠️ Route already in progress!');
+        return;
+    }
+    
+    if (currentRouteIndex >= optimizedRoute.length) {
+        alert('✅ All bins collected! Reset to start new route.');
+        return;
+    }
+    
+    isRouteActive = true;
+    document.getElementById('truckStatus').textContent = '🚛 Collecting...';
+    
+    // Animate truck movement
+    routeInterval = setInterval(() => {
+        moveTruckToNextBin();
+    }, 100); // Update every 100ms for smooth animation
+}
+
+function moveTruckToNextBin() {
+    if (!isRouteActive || currentRouteIndex >= optimizedRoute.length) {
+        if (currentRouteIndex >= optimizedRoute.length) {
+            returnToDepot();
+        }
+        return;
+    }
+    
+    const targetBin = optimizedRoute[currentRouteIndex];
+    const targetLat = targetBin.lat;
+    const targetLng = targetBin.lng;
+    
+    // Get current truck position
+    const currentLat = truckPosition[0];
+    const currentLng = truckPosition[1];
+    
+    // Calculate direction
+    const latDiff = targetLat - currentLat;
+    const lngDiff = targetLng - currentLng;
+    const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+    
+    // If close enough to target, collect bin
+    if (distance < 0.0005) {
+        collectBin(currentRouteIndex);
+        currentRouteIndex++;
+        updateRouteList();
+        calculateTotalDistance();
+        document.getElementById('binsCollected').textContent = currentRouteIndex;
+        return;
+    }
+    
+    // Move truck incrementally (smooth animation)
+    const speed = 0.0001; // Adjust for animation speed
+    const ratio = speed / distance;
+    
+    truckPosition[0] += latDiff * ratio;
+    truckPosition[1] += lngDiff * ratio;
+    
+    truckMarker.setLatLng(truckPosition);
+    
+    // Update speed display (simulated)
+    const simulatedSpeed = Math.round(20 + Math.random() * 20); // 20-40 km/h
+    document.getElementById('currentSpeed').textContent = simulatedSpeed;
+    
+    // Draw polyline showing path traveled
+    if (!routePolyline) {
+        routePolyline = L.polyline([truckPosition], {
+            color: '#667eea',
+            weight: 4,
+            opacity: 0.7
+        }).addTo(map);
+    } else {
+        routePolyline.addLatLng(truckPosition);
+    }
+}
+
+function collectBin(index) {
+    const bin = optimizedRoute[index];
+    
+    // Play collection sound
+    playCollectionSound();
+    
+    // Show notification
+    showNotification(`✅ Collected ${bin.id} at ${bin.area}`);
+    
+    // Change bin marker color to green
+    binMarkers[index].setStyle({ fillColor: '#10b981' });
+    
+    // Update popup
+    binMarkers[index].bindPopup(`
+        <b>✅ ${bin.id} - COLLECTED</b><br>
+        📍 ${bin.area}<br>
+        ⏰ ${new Date().toLocaleTimeString()}
+    `).openPopup();
+}
+
+function returnToDepot() {
+    clearInterval(routeInterval);
+    
+    // Animate truck back to depot
+    const returnInterval = setInterval(() => {
+        const depotLat = DEPOT.lat;
+        const depotLng = DEPOT.lng;
+        const currentLat = truckPosition[0];
+        const currentLng = truckPosition[1];
+        
+        const latDiff = depotLat - currentLat;
+        const lngDiff = depotLng - currentLng;
+        const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+        
+        if (distance < 0.0005) {
+            clearInterval(returnInterval);
+            completeRoute();
+            return;
+        }
+        
+        const speed = 0.0001;
+        const ratio = speed / distance;
+        
+        truckPosition[0] += latDiff * ratio;
+        truckPosition[1] += lngDiff * ratio;
+        
+        truckMarker.setLatLng(truckPosition);
+        routePolyline.addLatLng(truckPosition);
+    }, 100);
+}
+
+function completeRoute() {
+    isRouteActive = false;
+    document.getElementById('truckStatus').textContent = '✅ Route Completed!';
+    document.getElementById('currentSpeed').textContent = '0';
+    document.getElementById('distanceRemaining').textContent = '0';
+    document.getElementById('eta').textContent = '0 min';
+    
+    showNotification('🎉 Route completed! All bins collected successfully!');
+    playSuccessSound();
+}
+
+function pauseRoute() {
+    if (isRouteActive) {
+        clearInterval(routeInterval);
+        isRouteActive = false;
+        document.getElementById('truckStatus').textContent = '⏸️ Paused';
+        document.getElementById('currentSpeed').textContent = '0';
+    }
+}
+
+function stopRoute() {
+    if (confirm('⚠️ Stop and reset the route?')) {
+        clearInterval(routeInterval);
+        isRouteActive = false;
+        currentRouteIndex = 0;
+        truckPosition = [DEPOT.lat, DEPOT.lng];
+        truckMarker.setLatLng(truckPosition);
+        
+        if (routePolyline) {
+            map.removeLayer(routePolyline);
+            routePolyline = null;
+        }
+        
+        document.getElementById('truckStatus').textContent = 'Ready';
+        document.getElementById('binsCollected').textContent = '0';
+        document.getElementById('currentSpeed').textContent = '0';
+        
+        // Reset bin markers
+        binMarkers.forEach((marker, idx) => {
+            const bin = optimizedRoute[idx];
+            const fillColor = bin.fillLevel >= 90 ? '#ef4444' : 
+                             bin.fillLevel >= 70 ? '#f59e0b' : '#10b981';
+            marker.setStyle({ fillColor: fillColor });
+        });
+        
+        updateRouteList();
+        calculateTotalDistance();
+    }
+}
+
+function optimizeNewRoute() {
+    window.location.href = '/optimize';
+}
+
+function playCollectionSound() {
+    const audio = new Audio();
+    audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVqzn77BdGAg+ltryxm4gBSuBzvLaizsIGGS57OihUhELTKXh8bllHAU2jdXy0H0qBSZ7yO/ekD0LFF60' +
+        '6OunVRQLRp/g8r5rIAU1iNDy2YY2Bhxqvu7mnk0NDlagCiQTvCz/KVF8bJk=';
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log('Audio play failed:', e));
+}
+
+function playSuccessSound() {
+    const audio = new Audio();
+    audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVqzn77BdGAg+ltryxm4gBSuBzvLaizsIGGS57OihUhELTKXh8bllHAU2jdXy0H0qBSZ7yO/ekD0LFF60';
+    audio.volume = 0.7;
+    audio.play().catch(e => console.log('Audio play failed:', e));
+}
+
+function showNotification(message) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        z-index: 10000;
+        animation: slideIn 0.3s ease-out;
+        font-weight: bold;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Initialize on load
+window.addEventListener('load', initMap);
+</script>
+
+<style>
+@keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(400px); opacity: 0; }
+}
+
+.truck-marker {
+    background: none !important;
+    border: none !important;
+}
+</style>
+
+{% endblock %}

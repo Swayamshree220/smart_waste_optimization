@@ -1,0 +1,888 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .smart-bin-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+
+    .dashboard-card {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        margin-bottom: 20px;
+    }
+
+    .metric-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 25px;
+        text-align: center;
+        margin-bottom: 20px;
+        transition: transform 0.3s;
+    }
+
+    .metric-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .metric-value {
+        font-size: 48px;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+
+    .metric-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .bin-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        border-left: 5px solid #28a745;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        transition: all 0.3s;
+    }
+
+    .bin-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+    }
+
+    .bin-card.warning {
+        border-left-color: #ffc107;
+        background: linear-gradient(to right, #fff9e6 0%, #ffffff 100%);
+    }
+
+    .bin-card.danger {
+        border-left-color: #fd7e14;
+        background: linear-gradient(to right, #ffe8d6 0%, #ffffff 100%);
+    }
+
+    .bin-card.critical {
+        border-left-color: #dc3545;
+        background: linear-gradient(to right, #ffcccc 0%, #ffffff 100%);
+        animation: pulse-border 2s infinite;
+    }
+
+    @keyframes pulse-border {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+        50% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    }
+
+    .fill-bar {
+        height: 35px;
+        border-radius: 20px;
+        background: #e9ecef;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .fill-progress {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+        transition: width 0.5s ease;
+        position: relative;
+    }
+
+    .fill-progress::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+
+    .status-badge {
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: bold;
+        display: inline-block;
+    }
+
+    /* Alert Button Styles */
+    .alert-btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 25px;
+        font-weight: bold;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .alert-btn.critical-alert {
+        background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+        color: white;
+        animation: pulse-alert 1s infinite;
+    }
+
+    .alert-btn.high-alert {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        color: white;
+    }
+
+    .alert-btn.medium-alert {
+        background: linear-gradient(135deg, #ffc107 0%, #ffa000 100%);
+        color: #333;
+    }
+
+    .alert-btn.low-alert {
+        background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+        color: white;
+    }
+
+    .alert-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+    }
+
+    .alert-btn:active {
+        transform: scale(0.95);
+    }
+
+    @keyframes pulse-alert {
+        0%, 100% { 
+            transform: scale(1);
+            box-shadow: 0 3px 10px rgba(255, 0, 0, 0.5);
+        }
+        50% { 
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 0, 0, 0.8);
+        }
+    }
+
+    .alert-icon {
+        font-size: 18px;
+        animation: ring 2s infinite;
+    }
+
+    @keyframes ring {
+        0%, 100% { transform: rotate(0deg); }
+        10%, 30% { transform: rotate(-15deg); }
+        20%, 40% { transform: rotate(15deg); }
+    }
+
+    .live-dot {
+        width: 12px;
+        height: 12px;
+        background: #28a745;
+        border-radius: 50%;
+        display: inline-block;
+        animation: blink 1.5s infinite;
+        margin-right: 8px;
+    }
+
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+
+    .action-btn {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        border: none;
+        color: white;
+        padding: 15px 30px;
+        border-radius: 30px;
+        font-weight: bold;
+        margin: 5px;
+        transition: all 0.3s;
+        box-shadow: 0 5px 15px rgba(245, 87, 108, 0.3);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(245, 87, 108, 0.5);
+    }
+
+    .temp-indicator {
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .temp-normal { background: #d4edda; color: #155724; }
+    .temp-warm { background: #fff3cd; color: #856404; }
+    .temp-hot { background: #f8d7da; color: #721c24; }
+
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 80px;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+
+    .countdown-timer {
+        background: rgba(255,255,255,0.2);
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 13px;
+    }
+
+    /* Sound Control Panel */
+    .sound-control {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: white;
+        padding: 20px 25px;
+        border-radius: 30px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        z-index: 1000;
+        min-width: 200px;
+    }
+
+    .sound-toggle {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: bold;
+        cursor: pointer;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .volume-control {
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .volume-slider {
+        width: 100%;
+        height: 6px;
+        border-radius: 5px;
+        background: linear-gradient(to right, #667eea, #764ba2);
+        outline: none;
+        -webkit-appearance: none;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #667eea;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    .volume-slider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #667eea;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        border: none;
+    }
+
+    .volume-label {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 5px;
+        text-align: center;
+    }
+</style>
+<button class="btn btn-primary" onclick="window.location.href='/live-tracking'">
+    <i class="fas fa-map-marked-alt"></i> Track Live Route
+</button>
+<div class="smart-bin-container">
+    <div class="container">
+        <!-- Action Buttons -->
+        <div class="mb-4 text-center">
+            <button class="action-btn" onclick="addTestBins()">
+                <i class="fas fa-plus"></i> Add Test Bins
+            </button>
+            <button class="action-btn" onclick="simulateFill()">
+                <i class="fas fa-play"></i> Simulate Fill
+            </button>
+            <button class="action-btn" onclick="resetAllBins()">
+                <i class="fas fa-sync"></i> Reset All
+            </button>
+            <button class="btn btn-light" onclick="window.location.href='/routes/optimize'">
+                <i class="fas fa-route"></i> Optimize Routes
+            </button>
+        </div>
+
+        <!-- Metrics Row -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="metric-box">
+                    <i class="fas fa-trash fa-2x mb-2"></i>
+                    <div class="metric-label">Total Bins</div>
+                    <div class="metric-value" id="totalBins">0</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                    <div class="metric-label">Need Collection</div>
+                    <div class="metric-value" id="needCollection">0</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-box" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <i class="fas fa-fire fa-2x mb-2"></i>
+                    <div class="metric-label">Critical</div>
+                    <div class="metric-value" id="critical">0</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-box" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                    <i class="fas fa-chart-bar fa-2x mb-2"></i>
+                    <div class="metric-label">Avg Fill</div>
+                    <div class="metric-value" id="avgFill">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Card -->
+        <div class="dashboard-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3>
+                    <i class="fas fa-list"></i> Live Smart Bin Status
+                </h3>
+                <div>
+                    <span class="live-dot"></span>
+                    <span class="text-muted">Live</span>
+                    <span class="countdown-timer ms-3">
+                        <i class="fas fa-clock"></i> 
+                        Refresh: <span id="countdown">5</span>s
+                    </span>
+                </div>
+            </div>
+
+            <!-- Bins List Container -->
+            <div id="binsList"></div>
+        </div>
+
+        <!-- Chart Card -->
+        <div class="dashboard-card">
+            <h4 class="mb-3"><i class="fas fa-chart-line"></i> Fill Level Trend</h4>
+            <canvas id="fillChart" height="100"></canvas>
+        </div>
+    </div>
+</div>
+    
+
+<!-- Sound Control Panel -->
+<div class="sound-control">
+    <button class="sound-toggle" onclick="toggleSound()" id="soundBtn">
+        <i class="fas fa-volume-up"></i> Sound: ON
+    </button>
+    <div class="volume-control">
+        <input type="range" min="0" max="100" value="80" class="volume-slider" id="volumeSlider" oninput="updateVolume(this.value)">
+        <div class="volume-label">
+            <i class="fas fa-volume-down"></i> 
+            Volume: <span id="volumePercent">80</span>%
+            <i class="fas fa-volume-up"></i>
+        </div>
+    </div>
+    <button class="btn btn-sm btn-outline-primary w-100 mt-2" onclick="testAllSounds()">
+        <i class="fas fa-play"></i> Test All Sounds
+    </button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+let countdown = 5;
+let fillChart;
+let soundEnabled = true;
+let alertSounds = {};
+let masterVolume = 0.8; // Default 80% volume
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initSounds();
+    fetchBins();
+    startAutoRefresh();
+    initChart();
+});
+
+// Initialize Alert Sounds with Web Audio API (LOUD & CLEAR)
+function initSounds() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Create high-quality sounds using oscillators
+    alertSounds.critical = () => playCriticalSound(audioContext);
+    alertSounds.high = () => playHighSound(audioContext);
+    alertSounds.medium = () => playMediumSound(audioContext);
+    alertSounds.low = () => playLowSound(audioContext);
+}
+
+// CRITICAL ALERT - Urgent Siren (VERY LOUD)
+function playCriticalSound(ctx) {
+    const now = ctx.currentTime;
+    const duration = 2;
+    
+    // Create oscillator for siren effect
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    // Siren frequency sweep
+    oscillator.frequency.setValueAtTime(800, now);
+    oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+    oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.6);
+    oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.9);
+    oscillator.frequency.exponentialRampToValueAtTime(800, now + 1.2);
+    oscillator.frequency.exponentialRampToValueAtTime(1200, now + 1.5);
+    
+    // LOUD volume with pulsing (adjusted by master volume)
+    const vol = 0.8 * masterVolume;
+    gainNode.gain.setValueAtTime(vol, now);
+    gainNode.gain.exponentialRampToValueAtTime(masterVolume, now + 0.1);
+    gainNode.gain.setValueAtTime(masterVolume, now + 0.9);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    oscillator.start(now);
+    oscillator.stop(now + duration);
+}
+
+// HIGH ALERT - Steady Loud Beeps
+function playHighSound(ctx) {
+    const now = ctx.currentTime;
+    const beepDuration = 0.15;
+    const pauseDuration = 0.15;
+    const totalBeeps = 3;
+    
+    for (let i = 0; i < totalBeeps; i++) {
+        const startTime = now + i * (beepDuration + pauseDuration);
+        
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.frequency.value = 900; // High pitch
+        oscillator.type = 'square'; // Sharp sound
+        
+        // Loud volume (adjusted)
+        const vol = 0.8 * masterVolume;
+        gainNode.gain.setValueAtTime(vol, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beepDuration);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + beepDuration);
+    }
+}
+
+// MEDIUM ALERT - Moderate Beeps
+function playMediumSound(ctx) {
+    const now = ctx.currentTime;
+    const beepDuration = 0.2;
+    const pauseDuration = 0.2;
+    const totalBeeps = 2;
+    
+    for (let i = 0; i < totalBeeps; i++) {
+        const startTime = now + i * (beepDuration + pauseDuration);
+        
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.frequency.value = 700; // Medium pitch
+        oscillator.type = 'sine'; // Smoother sound
+        
+        // Medium-loud volume (adjusted)
+        const vol = 0.6 * masterVolume;
+        gainNode.gain.setValueAtTime(vol, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beepDuration);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + beepDuration);
+    }
+}
+
+// LOW ALERT - Gentle Notification
+function playLowSound(ctx) {
+    const now = ctx.currentTime;
+    const duration = 0.5;
+    
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    // Pleasant tone
+    oscillator.frequency.setValueAtTime(500, now);
+    oscillator.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+    oscillator.type = 'sine';
+    
+    // Moderate volume (adjusted)
+    const vol = 0.5 * masterVolume;
+    gainNode.gain.setValueAtTime(vol, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    oscillator.start(now);
+    oscillator.stop(now + duration);
+}
+
+// Update Volume
+function updateVolume(value) {
+    masterVolume = value / 100;
+    document.getElementById('volumePercent').textContent = value;
+}
+
+// Test All Sounds
+function testAllSounds() {
+    if (!soundEnabled) {
+        alert('⚠️ Please turn sound ON first!');
+        return;
+    }
+    
+    alert('🔊 Testing all alert sounds...\n\n1. LOW (Green)\n2. MEDIUM (Yellow)\n3. HIGH (Orange)\n4. CRITICAL (Red)');
+    
+    setTimeout(() => alertSounds.low(), 500);
+    setTimeout(() => alertSounds.medium(), 1500);
+    setTimeout(() => alertSounds.high(), 2500);
+    setTimeout(() => alertSounds.critical(), 3500);
+}
+
+// Play Alert Sound (IMPROVED VERSION)
+function playAlert(level, binId) {
+    if (!soundEnabled) return;
+    
+    // Call the sound function
+    switch(level) {
+        case 'critical':
+            alertSounds.critical();
+            break;
+        case 'high':
+            alertSounds.high();
+            break;
+        case 'medium':
+            alertSounds.medium();
+            break;
+        case 'low':
+            alertSounds.low();
+            break;
+    }
+    
+    console.log(`🔊 Playing ${level.toUpperCase()} alert for ${binId}`);
+}
+
+// Toggle Sound
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+    const btn = document.getElementById('soundBtn');
+    if (soundEnabled) {
+        btn.innerHTML = '<i class="fas fa-volume-up"></i> Sound: ON';
+        btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    } else {
+        btn.innerHTML = '<i class="fas fa-volume-mute"></i> Sound: OFF';
+        btn.style.background = '#6c757d';
+    }
+}
+
+function fetchBins() {
+    fetch('/api/iot/bins/all-status')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.bins && data.bins.length > 0) {
+                displayBins(data.bins);
+                updateMetrics(data.bins);
+                updateChart(data.bins);
+            } else {
+                showEmptyState();
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching bins:', err);
+            showEmptyState();
+        });
+}
+
+function displayBins(bins) {
+    const container = document.getElementById('binsList');
+    
+    container.innerHTML = bins.map(bin => {
+        const fillClass = bin.fill_level >= 90 ? 'critical' : 
+                          bin.fill_level >= 70 ? 'danger' : 
+                          bin.fill_level >= 50 ? 'warning' : '';
+        
+        const fillColor = bin.fill_level >= 90 ? '#dc3545' : 
+                          bin.fill_level >= 70 ? '#fd7e14' : 
+                          bin.fill_level >= 50 ? '#ffc107' : '#28a745';
+
+        const statusBadge = bin.fill_level >= 90 ? 
+            '<span class="status-badge bg-danger text-white">🔴 COLLECT NOW!</span>' :
+            bin.fill_level >= 70 ? 
+            '<span class="status-badge bg-warning text-dark">🟠 Schedule Soon</span>' :
+            bin.fill_level >= 50 ?
+            '<span class="status-badge bg-info text-white">🔵 Monitor</span>' :
+            '<span class="status-badge bg-success text-white">🟢 OK</span>';
+
+        // Alert button based on fill level
+        let alertBtn, alertLevel, alertText;
+        if (bin.fill_level >= 90) {
+            alertBtn = 'critical-alert';
+            alertLevel = 'critical';
+            alertText = '🚨 CRITICAL';
+        } else if (bin.fill_level >= 70) {
+            alertBtn = 'high-alert';
+            alertLevel = 'high';
+            alertText = '⚠️ HIGH';
+        } else if (bin.fill_level >= 50) {
+            alertBtn = 'medium-alert';
+            alertLevel = 'medium';
+            alertText = '⚡ MEDIUM';
+        } else {
+            alertBtn = 'low-alert';
+            alertLevel = 'low';
+            alertText = '✅ LOW';
+        }
+
+        const temp = bin.temperature || 25;
+        const tempClass = temp > 60 ? 'temp-hot' : temp > 40 ? 'temp-warm' : 'temp-normal';
+        const tempIcon = temp > 60 ? '🔥' : temp > 40 ? '🌡️' : '❄️';
+
+        const lastUpdate = bin.last_update ? 
+            new Date(bin.last_update).toLocaleTimeString() : 'Just now';
+
+        return `
+            <div class="bin-card ${fillClass}">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <h5 class="mb-1">
+                            <i class="fas fa-trash-alt"></i> ${bin.bin_id}
+                        </h5>
+                        <small class="text-muted">
+                            <i class="fas fa-map-marker-alt"></i> ${bin.area || 'Unknown'}
+                        </small>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block mb-1">Fill Level</small>
+                        <div class="fill-bar">
+                            <div class="fill-progress" style="width: ${bin.fill_level}%; background: ${fillColor};">
+                                ${bin.fill_level.toFixed(1)}%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="temp-indicator ${tempClass}">
+                            ${tempIcon} ${temp.toFixed(1)}°C
+                        </div>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        ${statusBadge}
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <button class="alert-btn ${alertBtn}" onclick="playAlert('${alertLevel}', '${bin.bin_id}')">
+                            <i class="fas fa-bell alert-icon"></i>
+                            ${alertText}
+                        </button>
+                    </div>
+                    <div class="col-md-1 text-end">
+                        <small class="text-muted d-block mb-2">
+                            <i class="fas fa-clock"></i> ${lastUpdate}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateMetrics(bins) {
+    const total = bins.length;
+    const needCollection = bins.filter(b => b.fill_level >= 70).length;
+    const critical = bins.filter(b => b.fill_level >= 90).length;
+    const avgFill = bins.reduce((sum, b) => sum + b.fill_level, 0) / total;
+
+    document.getElementById('totalBins').textContent = total;
+    document.getElementById('needCollection').textContent = needCollection;
+    document.getElementById('critical').textContent = critical;
+    document.getElementById('avgFill').textContent = avgFill.toFixed(1) + '%';
+
+    // Auto-play critical alerts
+    if (critical > 0 && soundEnabled) {
+        playAlert('critical', 'AUTO');
+    }
+}
+
+function showEmptyState() {
+    document.getElementById('binsList').innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h4>No Smart Bins Available</h4>
+            <p class="mb-4">Click "Add Test Bins" to create demo data or connect your IoT devices.</p>
+            <button class="action-btn" onclick="addTestBins()">
+                <i class="fas fa-plus"></i> Add Test Bins Now
+            </button>
+        </div>
+    `;
+    
+    document.getElementById('totalBins').textContent = '0';
+    document.getElementById('needCollection').textContent = '0';
+    document.getElementById('critical').textContent = '0';
+    document.getElementById('avgFill').textContent = '0%';
+}
+
+function startAutoRefresh() {
+    setInterval(() => {
+        fetchBins();
+        countdown = 5;
+    }, 5000);
+
+    setInterval(() => {
+        countdown--;
+        document.getElementById('countdown').textContent = countdown;
+        if (countdown <= 0) countdown = 5;
+    }, 1000);
+}
+
+function addTestBins() {
+    const testBins = [
+        { bin_id: 'BIN_001', fill_level: 85, weight_kg: 42, temperature: 28, humidity: 65, battery_level: 87, gps_lat: 20.2961, gps_lon: 85.8245 },
+        { bin_id: 'BIN_002', fill_level: 72, weight_kg: 35, temperature: 25, humidity: 60, battery_level: 92, gps_lat: 20.2971, gps_lon: 85.8255 },
+        { bin_id: 'BIN_003', fill_level: 45, weight_kg: 22, temperature: 26, humidity: 58, battery_level: 78, gps_lat: 20.2951, gps_lon: 85.8235 },
+        { bin_id: 'BIN_004', fill_level: 92, weight_kg: 48, temperature: 65, humidity: 70, battery_level: 45, gps_lat: 20.2981, gps_lon: 85.8265 },
+        { bin_id: 'BIN_005', fill_level: 60, weight_kg: 30, temperature: 24, humidity: 55, battery_level: 88, gps_lat: 20.2941, gps_lon: 85.8225 }
+    ];
+
+    Promise.all(testBins.map(bin => 
+        fetch('/api/iot/bin/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bin)
+        })
+    ))
+    .then(() => {
+        alert('✅ Successfully added 5 test bins!');
+        fetchBins();
+    })
+    .catch(err => {
+        alert('❌ Error adding bins. Make sure backend is running.');
+        console.error(err);
+    });
+}
+
+function simulateFill() {
+    fetch('/api/iot/bin/simulate-fill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ increase: 10 })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ All bins filled by 10%! Listen for alerts...');
+            fetchBins();
+        } else {
+            alert('❌ Simulation failed: ' + data.error);
+        }
+    })
+    .catch(err => {
+        alert('❌ Error: Make sure you have bins first!');
+        console.error(err);
+    });
+}
+
+function resetAllBins() {
+    if (confirm('⚠️ Reset all bins to 0%?')) {
+        alert('Reset functionality - implement /api/iot/bins/reset endpoint');
+    }
+}
+
+// Chart initialization
+function initChart() {
+    const ctx = document.getElementById('fillChart').getContext('2d');
+    fillChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Average Fill Level (%)',
+                data: [],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: true },
+                tooltip: { 
+                    enabled: true,
+                    callbacks: {
+                        label: function(context) {
+                            return 'Fill Level: ' + context.parsed.y.toFixed(1) + '%';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: value => value + '%'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateChart(bins) {
+    const avgFill = bins.reduce((sum, b) => sum + b.fill_level, 0) / bins.length;
+    const now = new Date().toLocaleTimeString();
+
+    fillChart.data.labels.push(now);
+    fillChart.data.datasets[0].data.push(avgFill);
+
+    if (fillChart.data.labels.length > 10) {
+        fillChart.data.labels.shift();
+        fillChart.data.datasets[0].data.shift();
+    }
+
+    fillChart.update();
+}
+</script>
+{% endblock %}
