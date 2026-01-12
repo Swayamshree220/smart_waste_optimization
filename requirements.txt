@@ -2,6 +2,7 @@ Flask==3.0.0
 Flask-SQLAlchemy==3.1.1
 Flask-CORS==4.0.0
 python-dotenv==1.0.0
+python-3.11.4
 
 # Core scientific stack (Python 3.12 compatible)
 numpy>=1.26.4
