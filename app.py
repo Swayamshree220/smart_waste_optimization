@@ -653,4 +653,4 @@ def api_predictive_analyze(truck_id):
 if __name__ == "__main__":
     print("\n🗑️ Smart Waste Optimization System – Bhubaneswar")
     print(f"Bins: {len(BINS)} | Depot: {DEPOT['name']}")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=10000)
